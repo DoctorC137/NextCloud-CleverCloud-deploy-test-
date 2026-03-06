@@ -30,6 +30,7 @@ echo "# Nextcloud data directory" > "$REAL_APP/data/.ncdata"
 rm -f "$REAL_APP/config/"*.php 2>/dev/null || true
 
 # --- PHP-FPM config ----------------------------------------------------------
+# Sessions are handled natively by Clever Cloud via ENABLE_REDIS=true + SESSION_TYPE=redis env vars.
 cat > "$REAL_APP/.user.ini" << EOF
 memory_limit = 512M
 output_buffering = 0
@@ -37,8 +38,6 @@ opcache.max_accelerated_files = 20000
 opcache.memory_consumption = 128
 opcache.interned_strings_buffer = 16
 opcache.revalidate_freq = 60
-session.save_handler = redis
-session.save_path = "tls://${REDIS_HOST}:${REDIS_PORT_CLEAN}?auth=${REDIS_PASSWORD}"
 EOF
 
 # --- PostgreSQL helpers ------------------------------------------------------
