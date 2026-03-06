@@ -218,7 +218,7 @@ fi
 
 clever env set --alias "$ALIAS" CC_PHP_VERSION      8.2
 clever env set --alias "$ALIAS" CC_PHP_MEMORY_LIMIT 512M
-clever env set --alias "$ALIAS" CC_PHP_EXTENSIONS   apcu
+clever env set --alias "$ALIAS" ENABLE_APCU         true
 clever env set --alias "$ALIAS" CC_WEBROOT          /
 clever env set --alias "$ALIAS" ENABLE_REDIS        "true"
 clever env set --alias "$ALIAS" SESSION_TYPE        "redis"
