@@ -132,17 +132,15 @@ write_config_php() {
   'forwarded_for_headers' => ['HTTP_X_FORWARDED_FOR'],
 
   // Cache local : APCu (in-process, zero reseau).
-  // Cache distribue + locking : Materia KV via Redis-compatible TLS.
-  // tls:// prefix in host activates TLS at the PHP stream level,
-  // which is compatible with persistent connections (unlike ssl_context).
+  // Cache distribue : Materia KV via Redis-compatible TLS.
+  // memcache.locking supprime : Materia KV ne supporte pas les Lists
+  // utilises par le locking DAV de Nextcloud — locking assure par PostgreSQL.
   'memcache.local'       => '\\OC\\Memcache\\APCu',
   'memcache.distributed' => '\\OC\\Memcache\\Redis',
-  'memcache.locking'     => '\\OC\\Memcache\\Redis',
   'redis' => [
-    'host'       => 'tls://${REDIS_HOST}',
-    'port'       => ${REDIS_PORT_CLEAN},
-    'password'   => '${REDIS_PASSWORD}',
-    'persistent' => true,
+    'host'     => 'tls://${REDIS_HOST}',
+    'port'     => ${REDIS_PORT_CLEAN},
+    'password' => '${REDIS_PASSWORD}',
   ],
 
   'datadirectory'              => '${REAL_APP}/data',
