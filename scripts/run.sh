@@ -227,7 +227,7 @@ else
 
     # Extraction des secrets depuis le config.php généré par occ
     extract_secret() {
-        php -r "\$c=[]; include '${REAL_APP}/config/config.php'; echo \$c['$1'] ?? '';" 2>/dev/null || true
+        php -r "\$CONFIG=[]; include '${REAL_APP}/config/config.php'; echo \$CONFIG['$1'] ?? '';" 2>/dev/null || true
     }
 
     NC_INSTANCE_ID=$(extract_secret "instanceid")
