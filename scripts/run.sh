@@ -56,12 +56,26 @@ db_set() {
 }
 
 # --- Wait for PostgreSQL -----------------------------------------------------
+# SELECT 1 peut passer alors que le serveur n'est pas encore prêt pour DDL.
+# On vérifie que pg_is_in_recovery() retourne 'f' (primary prêt) et qu'une
+# transaction DDL simple fonctionne avant de lancer occ maintenance:install.
 echo "[INFO] Waiting for PostgreSQL..."
-for i in $(seq 1 30); do
-    db_query "SELECT 1;" | grep -q 1 && echo "[OK] PostgreSQL ready (attempt $i)." && break
-    [ "$i" = "30" ] && echo "[ERR] PostgreSQL timeout." && exit 1
-    sleep 3
+PG_READY=0
+for i in $(seq 1 40); do
+    RESULT=$(db_query "SELECT pg_is_in_recovery();" 2>/dev/null | tr -d '[:space:]')
+    if [ "$RESULT" = "f" ]; then
+        # Vérifier aussi qu'on peut écrire (DDL simple)
+        TEST=$(db_query "CREATE TABLE IF NOT EXISTS _pg_ready_check (id int); DROP TABLE IF EXISTS _pg_ready_check;" 2>/dev/null && echo "ok")
+        if [ "$TEST" = "ok" ]; then
+            echo "[OK] PostgreSQL ready for DDL (attempt $i)."
+            PG_READY=1
+            break
+        fi
+    fi
+    echo "[INFO] PostgreSQL not ready yet (attempt $i, result='$RESULT'), waiting..."
+    sleep 5
 done
+[ "$PG_READY" = "0" ] && echo "[ERR] PostgreSQL timeout after 200s." && exit 1
 
 db_query "CREATE TABLE IF NOT EXISTS cc_nextcloud_secrets (
     key   VARCHAR(255) PRIMARY KEY,
@@ -121,11 +135,10 @@ write_config_php() {
   'trusted_proxies'       => ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'],
   'forwarded_for_headers' => ['HTTP_X_FORWARDED_FOR'],
 
-  // Cache local : APCu (in-process, zéro réseau — résilient si Redis indisponible).
-  // Cache distribué + locking : Materia KV via Redis-compatible TLS.
+  // Materia KV — Redis-compatible, TLS required.
   // tls:// prefix in host activates TLS at the PHP stream level,
   // which is compatible with persistent connections (unlike ssl_context).
-  'memcache.local'       => '\\OC\\Memcache\\APCu',
+  'memcache.local'       => '\\OC\\Memcache\\Redis',
   'memcache.distributed' => '\\OC\\Memcache\\Redis',
   'memcache.locking'     => '\\OC\\Memcache\\Redis',
   'redis' => [
@@ -185,16 +198,28 @@ if [ -n "$NC_INSTANCE_ID" ] && [ -n "$NC_PASSWORD_SALT" ] && [ -n "$NC_SECRET" ]
 else
 
     echo "[INFO] No secrets found — running first install."
-    php "$REAL_APP/occ" maintenance:install \
-        --database=pgsql \
-        --database-name="$POSTGRESQL_ADDON_DB" \
-        --database-host="$POSTGRESQL_ADDON_HOST:$POSTGRESQL_ADDON_PORT" \
-        --database-user="$POSTGRESQL_ADDON_USER" \
-        --database-pass="$POSTGRESQL_ADDON_PASSWORD" \
-        --admin-user="$NEXTCLOUD_ADMIN_USER" \
-        --admin-pass="$NEXTCLOUD_ADMIN_PASSWORD" \
-        --data-dir="$REAL_APP/data" \
-        --no-interaction
+    # Retry sur l'install : le serveur PostgreSQL peut couper la connexion
+    # juste après le polling (addon encore en init sur Clever Cloud).
+    INSTALL_OK=0
+    for attempt in 1 2 3; do
+        echo "[INFO] occ maintenance:install — attempt $attempt/3..."
+        if php "$REAL_APP/occ" maintenance:install \
+            --database=pgsql \
+            --database-name="$POSTGRESQL_ADDON_DB" \
+            --database-host="$POSTGRESQL_ADDON_HOST:$POSTGRESQL_ADDON_PORT" \
+            --database-user="$POSTGRESQL_ADDON_USER" \
+            --database-pass="$POSTGRESQL_ADDON_PASSWORD" \
+            --admin-user="$NEXTCLOUD_ADMIN_USER" \
+            --admin-pass="$NEXTCLOUD_ADMIN_PASSWORD" \
+            --data-dir="$REAL_APP/data" \
+            --no-interaction; then
+            INSTALL_OK=1
+            break
+        fi
+        echo "[WARN] Install attempt $attempt failed, waiting 15s before retry..."
+        sleep 15
+    done
+    [ "$INSTALL_OK" = "0" ] && echo "[ERR] occ maintenance:install failed after 3 attempts." && exit 1
 
     extract_secret() {
         php -r "\$CONFIG=[]; include '${REAL_APP}/config/config.php'; echo \$CONFIG['$1'] ?? '';" 2>/dev/null || true
