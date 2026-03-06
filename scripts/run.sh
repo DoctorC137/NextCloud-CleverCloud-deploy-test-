@@ -30,7 +30,6 @@ echo "# Nextcloud data directory" > "$REAL_APP/data/.ncdata"
 rm -f "$REAL_APP/config/"*.php 2>/dev/null || true
 
 # --- PHP-FPM config ----------------------------------------------------------
-# persistent=1: reuse TLS connection across requests (critical for Materia KV perf)
 cat > "$REAL_APP/.user.ini" << EOF
 memory_limit = 512M
 output_buffering = 0
@@ -39,7 +38,7 @@ opcache.memory_consumption = 128
 opcache.interned_strings_buffer = 16
 opcache.revalidate_freq = 60
 session.save_handler = redis
-session.save_path = "tls://${REDIS_HOST}:${REDIS_PORT_CLEAN}?auth=${REDIS_PASSWORD}&persistent=1"
+session.save_path = "tls://${REDIS_HOST}:${REDIS_PORT_CLEAN}?auth=${REDIS_PASSWORD}"
 EOF
 
 # --- PostgreSQL helpers ------------------------------------------------------
@@ -124,20 +123,16 @@ write_config_php() {
   'forwarded_for_headers' => ['HTTP_X_FORWARDED_FOR'],
 
   // Materia KV — Redis-compatible, TLS required.
-  // persistent=true: reuse TLS connections across requests (avoids per-request handshake).
-  // verify_peer_name=false: KV hostname may not match the certificate CN.
+  // tls:// prefix in host activates TLS at the PHP stream level,
+  // which is compatible with persistent connections (unlike ssl_context).
   'memcache.local'       => '\\OC\\Memcache\\Redis',
   'memcache.distributed' => '\\OC\\Memcache\\Redis',
   'memcache.locking'     => '\\OC\\Memcache\\Redis',
   'redis' => [
-    'host'        => '${REDIS_HOST}',
-    'port'        => ${REDIS_PORT_CLEAN},
-    'password'    => '${REDIS_PASSWORD}',
-    'persistent'  => true,
-    'ssl_context' => [
-      'verify_peer'      => true,
-      'verify_peer_name' => false,
-    ],
+    'host'       => 'tls://${REDIS_HOST}',
+    'port'       => ${REDIS_PORT_CLEAN},
+    'password'   => '${REDIS_PASSWORD}',
+    'persistent' => true,
   ],
 
   'datadirectory'              => '${REAL_APP}/data',
