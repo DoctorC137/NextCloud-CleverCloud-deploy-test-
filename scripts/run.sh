@@ -188,7 +188,11 @@ if [ -n "$NC_INSTANCE_ID" ] && [ -n "$NC_PASSWORD_SALT" ] && [ -n "$NC_SECRET" ]
     echo "[INFO] Secrets found — restarting."
     NC_VERSION="${NC_VERSION_STORED:-0.0.0}"
 
-    write_config_php "$NC_INSTANCE_ID" "$NC_PASSWORD_SALT" "$NC_SECRET" "$NC_VERSION"
+    # Désactiver locking si skeleton n'a pas encore tourné (même logique que premier boot)
+    NC_SKELETON_DONE_R=$(db_get "NC_SKELETON_UPLOADED" 2>/dev/null | tr -d '[:space:]')
+    LOCKING_MODE="enabled"
+    [ "$NC_SKELETON_DONE_R" != "1" ] && LOCKING_MODE="no-locking"
+    write_config_php "$NC_INSTANCE_ID" "$NC_PASSWORD_SALT" "$NC_SECRET" "$NC_VERSION" "$LOCKING_MODE"
     ensure_s3_bucket
 
     php "$REAL_APP/occ" upgrade --no-interaction 2>&1 || true

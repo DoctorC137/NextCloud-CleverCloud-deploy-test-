@@ -12,6 +12,11 @@
 # -----------------------------------------------------------------------------
 # Helper PostgreSQL — retourne "" en cas d'erreur (table absente, etc.)
 # -----------------------------------------------------------------------------
+REAL_APP=$(ls -d /home/bas/app_*/ 2>/dev/null | head -1 | sed 's|/$||')
+if [ -z "$REAL_APP" ]; then
+    echo "[ERR] Impossible de localiser le dossier de l'application." && exit 1
+fi
+
 db_query() {
     PGPASSWORD="$POSTGRESQL_ADDON_PASSWORD" psql \
         -h "$POSTGRESQL_ADDON_HOST" \
@@ -50,15 +55,6 @@ NC_HOST_HEADER="Host: $NEXTCLOUD_DOMAIN"
 
 # -----------------------------------------------------------------------------
 # Helper : réactive memcache.locking dans config.php via occ
-# Appelé en fin de script (succès ou échec) pour s'assurer que le locking
-# est toujours réactivé, même si skeleton.sh échoue.
-# -----------------------------------------------------------------------------
-REAL_APP=$(ls -d /home/bas/app_*/ 2>/dev/null | head -1 | sed 's|/$||')
-if [ -z "$REAL_APP" ]; then
-    echo "[ERR] Impossible de localiser le dossier de l'application." && exit 1
-fi
-
-enable_locking() {
     echo "[INFO] Réactivation de memcache.locking dans config.php..."
     php "$REAL_APP/occ" config:system:set memcache.locking \
         --value='\OC\Memcache\Redis' --type=string --no-interaction 2>/dev/null \
