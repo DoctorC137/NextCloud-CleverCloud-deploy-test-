@@ -1,10 +1,10 @@
 ![Clever Cloud logo](github-assets/clever-cloud-logo.png)
 
-# Nextcloud on Clever Cloud — no FS Bucket
+# Nextcloud on Clever Cloud — Materia KV
 [![Clever Cloud - PaaS](https://img.shields.io/badge/Clever%20Cloud-PaaS-orange)](https://clever-cloud.com)
 [![Nextcloud](https://img.shields.io/badge/Nextcloud-33-0082C9?logo=nextcloud)](https://nextcloud.com)
 
-> **POC branch** — FS Bucket-free architecture. Config is reconstructed from environment variables on every start. Validated: first install + restart with persistent user data. See `main` for the stable FS Bucket-based version.
+> **Variant** — Uses [Materia KV](https://www.clever-cloud.com/doc/addons/materia-kv/) instead of a Redis addon for cache and sessions. Forked from [nextcloud-on-clevercloud](https://github.com/DoctorC137/nextcloud-on-clevercloud), the Redis-based reference deployment.
 
 Production-ready deployment of [Nextcloud](https://nextcloud.com) on Clever Cloud without a FS Bucket addon. Nextcloud's generated secrets (`instanceid`, `passwordsalt`, `secret`) are stored as Clever Cloud environment variables via the platform API after first install, and `config.php` is fully rebuilt from env vars on every subsequent restart.
 
